@@ -1,1 +1,1 @@
-Centos7 lnmp环境自动搭建脚本~~
+Centos7 lnmp 环境自动搭建脚本~~
