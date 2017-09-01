@@ -747,7 +747,10 @@ function subversion_i() {
 }
 
 
-
+function ssh_i {
+	echo "Port=2222" /etc/ssh/sshd_config
+	systemctl restart sshd
+}
 
 
 a=$#
@@ -793,6 +796,10 @@ do
 		
 		"memcached")
 			memcached_i;
+		;;
+		
+		"ssh" )
+			ssh_i;
 		;;
 		
 		*)
