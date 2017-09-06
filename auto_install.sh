@@ -50,7 +50,7 @@ cat > /usr/local/mysql/my.cnf <<EOF
 [mysqld]
 basedir = /usr/local/mysql
 datadir = /usr/local/mysql/data
-port = 3306
+port = 33065
 socket = /tmp/mysql.sock
 pid-file = /usr/local/mysql/logs/mysql.pid
 log-error = /usr/local/mysql/logs/error.log
@@ -251,8 +251,8 @@ http {
               '"\$http_user_agent" /\$http_x_forwarded_for';
 
     server {
-        listen 80 default_server;
-        server_name localhost;
+        listen 80;
+        server_name 127.0.0.1;
         root /home/wwwroot/;
         index index.php index.html index.htm;
 
@@ -263,19 +263,7 @@ http {
             fastcgi_param  PHP_VALUE        open_basedir=\$document_root:/tmp/:/proc/;
             include        fastcgi_params;
         }
-	}
-
-
-    server {
-        server_name _;
-        return 444;
-	}
-
-	
-    server { 
-        listen 80;
-        server_name 127.0.0.1;
-        location /ngx_status {
+	    location /ngx_status {
             allow 127.0.0.1;
             stub_status on;
 	    access_log off;
@@ -287,7 +275,16 @@ http {
             fastcgi_param SCRIPT_FILENAME \$fastcgi_script_name;
 	    access_log off;
 	}	 
-	}    
+	} 
+	
+
+
+    server {
+		listen 80 default_server;
+        server_name _;
+        return 444;
+	}
+	
     include vhost/*.conf;
 }
 EOF
@@ -300,35 +297,35 @@ touch /usr/local/nginx/conf/vhost/virtual-host.temp
 cat > /usr/local/nginx/conf/vhost/virtual-host.temp <<eof
 server {
     server_name _;
-                listen 8080;
-                index index.php index.html index.htm;
-                root /home/wwwroot/website/public;
+    listen 8080;
+    index index.php index.html index.htm;
+    root /home/wwwroot/website/public;
 
-                location / {
-                        if (!-e $request_filename) {
-                        rewrite  ^(.*)$  /index.php?s=/$1  last;
-                        break;
-                        }
-                }
+    location / {
+		if (!-e $request_filename) {
+		rewrite  ^(.*)$  /index.php?s=/$1  last;
+		break;
+    }
+    }
 
-                location ~ \.php\$ {
-                        fastcgi_pass   127.0.0.1:9000;
-                        fastcgi_index  index.php;
-                        fastcgi_param  SCRIPT_FILENAME  \$document_root\$fastcgi_script_name;
-                        fastcgi_param  PHP_VALUE         open_basedir=/home/wwwroot/website/:/tmp/:/proc/;
-                        include        fastcgi_params;
+    location ~ \.php\$ {
+		fastcgi_pass   127.0.0.1:9000;
+		fastcgi_index  index.php;
+		fastcgi_param  SCRIPT_FILENAME  \$document_root\$fastcgi_script_name;
+		fastcgi_param  PHP_VALUE         open_basedir=/home/wwwroot/website/:/tmp/:/proc/;
+		include        fastcgi_params;
         }
-                location ~ .*\.(gif|jpg|jpeg|png|bmp|swf)$ {
-                                expires      1s;
-                }
+    location ~ .*\.(gif|jpg|jpeg|png|bmp|swf)$ {
+		expires   1s;
+    }
 
-                location ~ .*\.(js|css)?$ {
-                                expires      1s;
-                }
+    location ~ .*\.(js|css)?$ {
+		expires   1s;
+    }
 
-                access_log  /home/wwwlog/website/access.log access;
-                error_log  /home/wwwlog/website/error.log error;
-        }
+    access_log  /home/wwwlog/website/access.log access;
+    error_log  /home/wwwlog/website/error.log error;
+}
 eof
 
 
@@ -629,9 +626,11 @@ ln -s /usr/local/libmemcached-1.0 /usr/local/libmemcached
 cd $HOME
 tar -xf memcached-2.2.0.tgz
 cd memcached-2.2.0
+#autoconf
 /usr/local/php/bin/phpize
 ./configure --enable-memcached --with-php-config=/usr/local/php/bin/php-config --with-libmemcached-dir=/usr/local/libmemcached --disable-memcached-sasl
 make && make install
+##position
 echo 'extension_dir = "/usr/local/php/lib/php/extensions/no-debug-non-zts-20131226/"' >> /usr/local/php/etc/php.ini
 echo 'extension= "memcached.so"' >> /usr/local/php/etc/php.ini
 
@@ -642,8 +641,17 @@ tar -xvf memcached-1.5.1.tar.gz
 cd memcached-1.5.1
 ./configure --prefix=/usr/local/memcached-1.5
 make && make install
-/usr/local/memcached-1.5/bin/memcached -d -c10240 -m 1024 -uroot
-echo "/usr/local/memcached-1.5/bin/memcached -d -c10240 -m 1024 -uroot" >> /etc/rc.d/rc.local
+
+/usr/local/memcached-1.5/bin/memcached -d -c10240 -m 64 -uroot
+if [ $? -eq 0 ];then
+	echo "`date '+%F %T'`  memcached installed successfully!" >> ${HOME}/install_info
+else
+	echo "`date '+%F %T'`  memcached test failed. Please check your config file." >> ${HOME}/install_info
+	exit
+fi
+
+ln -s /usr/local/memcached-1.5 /usr/local/memcached
+echo "/usr/local/memcached-1.5/bin/memcached -d -c10240 -m 64 -uroot" >> /etc/rc.d/rc.local
 chmod +x /etc/rc.d/rc.local
 
 
@@ -666,7 +674,7 @@ mv /etc/fail2ban/jail.conf /etc/fail2ban/jail.conf.bak
 cat > /etc/fail2ban/jail.conf <<eof
 [DEFAULT]
 ignoreip = 127.0.0.1
-bantime = 86400
+bantime = 3600
 findtime = 600
 maxretry = 5
 
@@ -747,10 +755,7 @@ function subversion_i() {
 }
 
 
-function ssh_i {
-	echo "Port=2222" /etc/ssh/sshd_config
-	systemctl restart sshd
-}
+
 
 
 a=$#
@@ -796,10 +801,6 @@ do
 		
 		"memcached")
 			memcached_i;
-		;;
-		
-		"ssh" )
-			ssh_i;
 		;;
 		
 		*)
