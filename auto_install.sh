@@ -219,7 +219,6 @@ ln -s /usr/local/nginx/sbin/nginx /usr/bin
 
 #To support php:
 cat > /usr/local/nginx/conf/nginx.conf <<EOF
-
 worker_processes  auto;
 user  nginx;
 worker_rlimit_nofile 51200;
@@ -230,7 +229,7 @@ events {
 }
 
 http {
-    limit_req_zone \$binary_remote_addr zone=req:200m rate=300r/s;
+    limit_req_zone $binary_remote_addr zone=req:200m rate=300r/s;
     limit_req zone=req burst=50;
     client_body_buffer_size 32k;
     client_header_buffer_size 2k;
@@ -246,24 +245,36 @@ http {
     gzip_comp_level 2;
     gzip_types       text/plain text/css text/xml text/javascript application/x-javascript application/xml application/rss+xml application/xhtml+xml application/atom_xml;
     gzip_vary on;
-    log_format  access  '\$remote_addr - \$remote_user [\$time_local] "\$request" '
-              '\$status \$body_bytes_sent "\$http_referer" '
-              '"\$http_user_agent" /\$http_x_forwarded_for';
+    log_format  access  '$remote_addr - $remote_user [$time_local] "$request" '
+              '$status $body_bytes_sent "$http_referer" '
+              '"$http_user_agent" $http_x_forwarded_for';
 
     server {
-        listen 80;
-        server_name 127.0.0.1;
+        listen 80 default_server;
+        server_name localhost;
         root /home/wwwroot/;
         index index.php index.html index.htm;
 
         location ~ \.php$ {
             fastcgi_pass   127.0.0.1:9000;
             fastcgi_index  index.php;
-            fastcgi_param  SCRIPT_FILENAME  \$document_root\$fastcgi_script_name;
-            fastcgi_param  PHP_VALUE        open_basedir=\$document_root:/tmp/:/proc/;
+            fastcgi_param  SCRIPT_FILENAME  $document_root$fastcgi_script_name;
+            fastcgi_param  PHP_VALUE        open_basedir=$document_root:/tmp/:/proc/;
             include        fastcgi_params;
         }
-	    location /ngx_status {
+	}
+
+
+    server {
+        server_name _;
+        return 444;
+	}
+
+	
+    server { 
+        listen 80;
+        server_name 127.0.0.1;
+        location /ngx_status {
             allow 127.0.0.1;
             stub_status on;
 	    access_log off;
@@ -272,21 +283,13 @@ http {
         location /phpfpm_status {
             include fastcgi_params;
             fastcgi_pass 127.0.0.1:9000;
-            fastcgi_param SCRIPT_FILENAME \$fastcgi_script_name;
+            fastcgi_param SCRIPT_FILENAME $fastcgi_script_name;
 	    access_log off;
 	}	 
-	} 
-	
-
-
-    server {
-		listen 80 default_server;
-        server_name _;
-        return 444;
-	}
-	
+	}    
     include vhost/*.conf;
 }
+
 EOF
 
 
