@@ -351,6 +351,30 @@ ExecStop=/usr/local/nginx/sbin/nginx -s stop
 WantedBy=multi-user.target
 EOF
 
+#nginx logrotate
+cat > /etc/logrotate.d/nginx <<EOF
+/usr/local/nginx/logs/*.log {
+    daily
+    rotate 14
+    dateext
+    missingok
+    notifempty
+    noolddir
+    compress
+    sharedscripts
+    postrotate
+    [ ! -f /usr/local/nginx/logs/nginx.pid ] || kill -USR1 633
+    endscript
+}
+EOF
+#cron
+[ -e /var/spool/cron/root ] || touch /var/spool/cron/root
+cat > /var/spool/cron/root <<EOF
+#0 24 * * * /usr/sbin/logrotate -f /etc/logrotate.d/nginx
+EOF
+
+echo "`date '+%F %T'`   nginx logrotate配置完成! 请根据nginx实际日志存放目录修改配置文件（/etc/logrotate.d/nginx）,并开启计划任务！" >> ${HOME}/install_info
+
 #check config
 /usr/local/nginx/sbin/nginx -t
 if [ $? -eq 0 ];then
@@ -629,7 +653,7 @@ ln -s /usr/local/libmemcached-1.0 /usr/local/libmemcached
 cd $HOME
 tar -xf memcached-2.2.0.tgz
 cd memcached-2.2.0
-#autoconf
+yum install autoconf -y
 /usr/local/php/bin/phpize
 ./configure --enable-memcached --with-php-config=/usr/local/php/bin/php-config --with-libmemcached-dir=/usr/local/libmemcached --disable-memcached-sasl
 make && make install
